@@ -2,12 +2,26 @@ import React, { useState, useEffect, useRef } from "react";
 import ReactDOM from "react-dom";
 import "./index.css";
 
-function ChatMessage({ sender, text }) {
-  let base = "max-w-[90%] px-3 py-2 rounded shadow text-sm whitespace-pre-wrap";
+function ChatMessage({ sender, text, onPin }) {
+  let base = "max-w-[90%] px-3 py-2 rounded shadow text-sm whitespace-pre-wrap relative group";
   if (sender === "user") base += " bg-blue-600 text-white self-end";
   else if (sender === "bot") base += " bg-green-600 text-white";
   else base += " bg-gray-300 text-gray-800";
-  return <div className={base}>{text}</div>;
+  
+  return (
+    <div className={base}>
+      {text}
+      {sender === "bot" && onPin && (
+        <button
+          onClick={() => onPin(text)}
+          className="absolute -top-2 -right-2 bg-yellow-400 text-yellow-900 rounded-full w-6 h-6 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+          title="Pin to notes"
+        >
+          📌
+        </button>
+      )}
+    </div>
+  );
 }
 
 function PopupApp() {
@@ -16,6 +30,10 @@ function PopupApp() {
   const [summary, setSummary] = useState("");
   const [tabId, setTabId] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [suggestions, setSuggestions] = useState([]);
+  const [notes, setNotes] = useState([]);
+  const [showNotes, setShowNotes] = useState(false);
+  const [currentDocId, setCurrentDocId] = useState("default");
   const endRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -31,7 +49,13 @@ function PopupApp() {
       setTabId(id);
       // no summary on mount
     });
+    fetchNotes(); // Load existing notes
   }, []);
+
+  // Refresh notes when document changes
+  useEffect(() => {
+    fetchNotes(currentDocId);
+  }, [currentDocId]);
 
   const summarisePage = () => {
      if (!tabId) {
@@ -82,7 +106,13 @@ function PopupApp() {
               body: JSON.stringify({ text }),
             })
               .then((r) => r.json())
-              .then((json) => setSummary(json.summary))
+              .then((json) => {
+                setSummary(json.summary);
+                if (json.document_id) {
+                  setCurrentDocId(json.document_id);
+                }
+                fetchAutoSuggestions();
+              })
               .catch((err) => alert('Summarise failed: ' + err.message));
           }
         );
@@ -108,7 +138,13 @@ function PopupApp() {
                 body: JSON.stringify({ text }),
               })
                 .then((r) => r.json())
-                .then((json) => setSummary(json.summary))
+                .then((json) => {
+                  setSummary(json.summary);
+                  if (json.document_id) {
+                    setCurrentDocId(json.document_id);
+                  }
+                  fetchAutoSuggestions();
+                })
                 .catch((err) => alert('Summarise failed: ' + err.message));
             }
           }
@@ -126,19 +162,23 @@ function PopupApp() {
     fetch('http://localhost:8000/ask', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question: q }),
+      body: JSON.stringify({ question: q, document_id: currentDocId }),
     })
       .then((r) => r.json())
-      .then((json) => setMessages((m) => [...m, { sender: 'bot', text: json.answer }]))
+      .then((json) => {
+        setMessages((m) => [...m, { sender: 'bot', text: json.answer }]);
+        fetchAutoSuggestions(); // Refresh suggestions after each answer
+      })
       .catch((err) => setMessages((m) => [...m, { sender: 'system', text: `Error: ${err.message}` }]));
   };
 
   const uploadFile = (file) => {
-    if (!file.name.toLowerCase().endsWith('.pdf')) {
-      alert('Only PDF files are supported');
-      return;
-    }
+     if (!file.name.toLowerCase().endsWith('.pdf')) {
+       alert('Only PDF files are supported');
+       return;
+     }
 
+    setCurrentDocId(file.name.replace(/[^a-zA-Z0-9]/g, '_'));
     const formData = new FormData();
     formData.append('file', file);
 
@@ -147,7 +187,10 @@ function PopupApp() {
       body: formData,
     })
       .then((r) => r.json())
-      .then((json) => setSummary(json.summary))
+      .then((json) => {
+        setSummary(json.summary);
+        fetchAutoSuggestions();
+      })
       .catch((err) => alert('Upload failed: ' + err.message));
   };
 
@@ -177,6 +220,46 @@ function PopupApp() {
     fileInputRef.current?.click();
   };
 
+  const fetchAutoSuggestions = () => {
+    fetch(`http://localhost:8000/auto-suggestions?document_id=${currentDocId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    })
+      .then((r) => r.json())
+      .then((json) => setSuggestions(json.suggestions))
+      .catch(() => setSuggestions([]));
+  };
+
+  const saveNote = (content, topic = "") => {
+     fetch('http://localhost:8000/notes', {
+       method: 'POST',
+       headers: { 'Content-Type': 'application/json' },
+       body: JSON.stringify({
+         content,
+         document_id: currentDocId,
+         topic
+       }),
+     })
+       .then(() => fetchNotes(currentDocId))
+       .catch((err) => console.error('Note save failed:', err));
+   };
+
+  const fetchNotes = (docId = currentDocId) => {
+    fetch(`http://localhost:8000/notes?document_id=${docId}`)
+      .then((r) => r.json())
+      .then((json) => setNotes(json.notes))
+      .catch(() => setNotes([]));
+  };
+
+  const askSuggestedQuestion = (suggestedQ) => {
+    setQuestion(suggestedQ);
+    handleAsk({ preventDefault: () => {}, target: { question: { value: suggestedQ } } });
+  };
+
+  const pinResponseAsNote = (responseText) => {
+    saveNote(responseText, "Chat Response");
+  };
+
   return (
     <div 
       className="flex flex-col h-full"
@@ -192,14 +275,17 @@ function PopupApp() {
       
       <div className="pb-2 border-b border-gray-300">
         <h1 className="font-semibold text-xl text-gray-800 mb-3">DocBot</h1>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-1">
           <button onClick={summarisePage} className="bg-purple-600 text-white px-3 py-1 rounded text-xs font-medium">
             Summarise Page
           </button>
           <button onClick={openFileDialog} className="bg-indigo-600 text-white px-3 py-1 rounded text-xs font-medium">
             Upload PDF
           </button>
-          <button onClick={() => setSummary("")} className="bg-gray-400 text-white px-3 py-1 rounded text-xs col-span-2">Clear</button>
+          <button onClick={() => setShowNotes(!showNotes)} className="bg-emerald-600 text-white px-3 py-1 rounded text-xs font-medium">
+            {showNotes ? 'Hide' : 'Notes'}
+          </button>
+          <button onClick={() => setSummary("")} className="bg-gray-400 text-white px-3 py-1 rounded text-xs col-span-3">Clear</button>
         </div>
         <input
           ref={fileInputRef}
@@ -213,10 +299,50 @@ function PopupApp() {
             <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap max-h-32 overflow-y-auto">{summary}</p>
           </div>
         )}
+        
+        {/* Auto-suggestions */}
+        {suggestions.length > 0 && (
+          <div className="mt-3">
+            <p className="text-xs text-gray-600 mb-2">💡 Suggested questions:</p>
+            <div className="space-y-1">
+              {suggestions.map((suggestion, i) => (
+                <button
+                  key={i}
+                  onClick={() => askSuggestedQuestion(suggestion)}
+                  className="block w-full text-left text-xs bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded border text-blue-700"
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
+      
+      {/* Notes Panel */}
+      {showNotes && (
+        <div className="border-b border-gray-300 pb-2">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-medium text-sm text-gray-800">📝 Vestige Notes</h3>
+            <button onClick={fetchNotes} className="text-xs text-gray-500 hover:text-gray-700">Refresh</button>
+          </div>
+          <div className="max-h-24 overflow-y-auto space-y-1">
+            {notes.length === 0 ? (
+              <p className="text-xs text-gray-500 italic">No notes yet. Pin responses to save them!</p>
+            ) : (
+              notes.slice(-5).map((note) => (
+                <div key={note.note_id} className="bg-yellow-50 border-l-2 border-yellow-400 px-2 py-1 text-xs">
+                  <div className="font-medium text-yellow-800">{note.topic}</div>
+                  <div className="text-gray-700 truncate">{note.content}</div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
       <div className="flex-1 overflow-y-auto my-2 flex flex-col space-y-1">
         {messages.map((m, i) => (
-          <ChatMessage key={i} sender={m.sender} text={m.text} />
+          <ChatMessage key={i} sender={m.sender} text={m.text} onPin={pinResponseAsNote} />
         ))}
         <div ref={endRef} />
       </div>
