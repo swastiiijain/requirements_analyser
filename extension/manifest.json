@@ -1,0 +1,25 @@
+{
+  "name": "DocBot",
+  "description": "Document-analysis chatbot that lets you query the contents of the current page (PDF, Google Docs, Word Online, Excel Online, etc.).",
+  "version": "1.0.0",
+  "manifest_version": 3,
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": ["<all_urls>"],
+  "content_security_policy": {
+    "extension_pages": "default-src 'self'; img-src 'self' data:; connect-src 'self' https://api.openai.com https://generativelanguage.googleapis.com http://localhost:8000 http://127.0.0.1:8000; style-src 'self' 'unsafe-inline'; script-src 'self';"
+  },
+  "action": {
+    "default_title": "DocBot",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["contentScript.js"],
+      "run_at": "document_idle"
+    }
+  ]
+} 

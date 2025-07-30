@@ -47,3 +47,23 @@ The API will be available at `http://localhost:8000`. Use the automatically gene
 ---
 
 Frontend and further instructions will follow.
+
+## Browser Extension (DocBot)
+
+A Manifest V3 Chrome/Edge extension is provided in the `extension/` folder. It contains:
+
+* `manifest.json` – extension metadata and permissions
+* `background.js` – service-worker that stores scraped page text and proxies chat queries to OpenAI
+* `contentScript.js` – injected into every tab to collect visible text (and PDF text via the browser viewer)
+* `popup.html` + `popup.js` – React + Tailwind chat UI that appears when you click the toolbar icon
+
+### Quick start
+
+1. Create an OpenAI API key and keep it handy.
+2. In Chrome/Edge, open `chrome://extensions` (or `edge://extensions`), enable *Developer mode* and click *Load unpacked*.
+3. Select the `extension/` directory of this repo. The DocBot icon should appear in the toolbar.
+4. Navigate to any online document (Google Docs, Word Online, PDFs, etc.) and click the icon.
+5. Press **Load Document** to extract the visible text. A short summary will be shown.
+6. Paste your OpenAI API key, save it, then start chatting about the document!
+
+No data ever leaves your machine except when you explicitly ask a question – only then do the *document text* and your *question* get sent to the OpenAI API via HTTPS. The extension never touches local files beyond the current page context.

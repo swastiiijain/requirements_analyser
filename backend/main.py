@@ -4,13 +4,13 @@ from __future__ import annotations
 from dotenv import load_dotenv
 load_dotenv()
 
-from fastapi import Depends, FastAPI, Header, HTTPException, status
+from fastapi import Depends, FastAPI, Header, HTTPException, status, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend import auth as auth_utils
 from backend import chatbot
 from backend import document_reader
-from backend.schemas import AskRequest, AskResponse, LoginRequest, LoginResponse, ReadDocResponse
+from backend.schemas import AskRequest, AskResponse, LoginRequest, LoginResponse, ReadDocResponse, SummariseRequest, SummariseResponse, UploadResponse
 
 app = FastAPI(title="Secure Document Chatbot")
 
@@ -56,12 +56,56 @@ def read_doc(token: str = Depends(_parse_bearer)):
     return ReadDocResponse(filename=filename, characters=len(text))
 
 
+@app.post("/summarise", response_model=SummariseResponse, tags=["document"])
+def summarise_page(req: SummariseRequest):
+    text = req.text.strip()
+    if not text:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No text provided")
+    summary = chatbot.summarise(text)
+    # Store text in temp cache for later RAG (single-session variant)
+    session_docs["last"] = text
+    return SummariseResponse(summary=summary, characters=len(text))
+
+
 @app.post("/ask", response_model=AskResponse, tags=["chat"])
-def ask_question(req: AskRequest, token: str = Depends(_parse_bearer)):
-    _validate_token(token)
-    context = session_docs.get(token)
+def ask_question(req: AskRequest):
+    context = session_docs.get("last")
     if not context:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No document has been analyzed for this session. Click 'Read Active Document' first.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No document has been analyzed for this session. Click 'Summarise Page' first.")
 
     answer = chatbot.ask(req.question, context)
-    return AskResponse(answer=answer) 
+    return AskResponse(answer=answer)
+
+
+@app.post("/upload", response_model=UploadResponse, tags=["document"])
+async def upload_document(file: UploadFile = File(...)):
+    if not file.filename.lower().endswith('.pdf'):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only PDF files are supported")
+
+    try:
+        # Read the uploaded file content
+        content = await file.read()
+
+        # Extract text from PDF
+        import pdfplumber
+        import io
+
+        text = ""
+        with pdfplumber.open(io.BytesIO(content)) as pdf:
+            for page in pdf.pages:
+                extracted = page.extract_text() or ""
+                text += extracted + "\n"
+
+        if not text.strip():
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No text found in PDF")
+
+        # Generate summary
+        summary = chatbot.summarise(text)
+
+        # Store for RAG
+        session_docs["last"] = text
+
+        return UploadResponse(summary=summary, characters=len(text))
+
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to process PDF: {str(e)}") 

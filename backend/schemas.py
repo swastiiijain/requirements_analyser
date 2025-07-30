@@ -22,3 +22,17 @@ class AskResponse(BaseModel):
 class ReadDocResponse(BaseModel):
     filename: str
     characters: int 
+
+
+class SummariseRequest(BaseModel):
+    text: str
+
+
+class SummariseResponse(BaseModel):
+    summary: str
+    characters: int 
+
+
+class UploadResponse(BaseModel):
+    summary: str
+    characters: int 
