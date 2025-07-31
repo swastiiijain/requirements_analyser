@@ -184,6 +184,16 @@ def get_notes(document_id: str = None):
     return NotesListResponse(notes=[NoteResponse(**note) for note in notes])
 
 
+@app.delete("/notes/{note_id}", status_code=204, tags=["notes"])
+def delete_note(note_id: str):
+    for doc_id, lst in notes_storage.items():
+        before = len(lst)
+        notes_storage[doc_id] = [n for n in lst if n['note_id'] != note_id]
+        if len(notes_storage[doc_id]) < before:
+            return
+    raise HTTPException(status_code=404, detail="Note not found")
+
+
 @app.post("/compare", response_model=CompareResponse, tags=["document"])
 async def compare_documents_endpoint(req: CompareRequest):
     summary, changes = chatbot.compare_documents(

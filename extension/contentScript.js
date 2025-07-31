@@ -44,6 +44,11 @@ function highlightText(text, color = '#fef08a') {
       if (highlightedHTML !== textNode.textContent) {
         const wrapper = document.createElement('span');
         wrapper.innerHTML = highlightedHTML;
+        // Add hover to expand
+        wrapper.querySelectorAll('mark[data-docbot-highlight]').forEach(mark=>{
+          mark.addEventListener('mouseenter', ()=>{ mark.style.backgroundColor='#fde68a';});
+          mark.addEventListener('mouseleave', ()=>{ mark.style.backgroundColor=color;});
+        });
         parent.replaceChild(wrapper, textNode);
       }
     }

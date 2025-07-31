@@ -10,10 +10,8 @@ load_dotenv()
 
 # Configure Gemini client using API key from environment
 api_key = os.getenv("GEMINI_API_KEY")
-print("Loaded GEMINI_API_KEY:", api_key)
 if api_key:
     genai.configure(api_key=api_key)
-    print("Loaded GEMINI_API_KEY:", os.getenv("GEMINI_API_KEY"))
 else:
     raise EnvironmentError("GEMINI_API_KEY not found in environment variables.")
 
