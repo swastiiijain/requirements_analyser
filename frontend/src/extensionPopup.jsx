@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import ReactDOM from "react-dom";
 import "./index.css";
+import { jsPDF } from "jspdf";
 
 // --- per-page helpers ---
 const makePageKey = (url) => (url || '').replace(/[#?].*$/, '');
@@ -22,18 +23,38 @@ const loadSessionFromStorage = (docId) => {
 // Debounce saving session to avoid excessive writes
 let saveTimer;
 
-function ChatMessage({ sender, text, onPin, pinned }) {
+function ChatMessage({ sender, text, onPin, pinned, anchorId, tabId }) {
   let base = "max-w-[90%] px-3 py-2 rounded shadow text-sm whitespace-pre-wrap relative group";
   if (sender === "user") base += " bg-blue-600 text-white self-end";
   else if (sender === "bot") base += " bg-green-600 text-white";
   else base += " bg-gray-300 text-gray-800";
 
+  const [hover, setHover] = useState(false);
   return (
-    <div className={base}>
+    <div
+      className={base}
+      onMouseEnter={() => {
+        setHover(true);
+        if (sender === 'bot' && anchorId && tabId) {
+          chrome.runtime.sendMessage({ type: 'docbot:scroll_to', anchorId, tabId });
+        }
+      }}
+      onMouseLeave={() => setHover(false)}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (sender === 'bot' && onPin) {
+          // Allow pin click handling to run separately
+        }
+      }}
+      style={{ opacity: hover ? 0.8 : 1 }}
+    >
       {text}
       {sender === "bot" && onPin && (
         <button
-          onClick={() => onPin(text)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onPin(text);
+          }}
           className={`absolute -top-2 -right-2 rounded-full w-6 h-6 text-xs transition-opacity ${pinned ? 'bg-yellow-400 text-yellow-900' : 'bg-gray-200 text-gray-600 opacity-0 group-hover:opacity-100'}`}
           title={pinned ? "Pinned" : "Pin to notes"}
         >
@@ -48,6 +69,7 @@ function PopupApp() {
   const [messages, setMessages] = useState([]);
   const [question, setQuestion] = useState("");
   const [summary, setSummary] = useState("");
+  const [summaryExpanded, setSummaryExpanded] = useState(false);
   const [pinnedMap, setPinnedMap] = useState({});
   const [tabId, setTabId] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -60,6 +82,8 @@ function PopupApp() {
   const fileInputRef = useRef(null);
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [loadingDelete, setLoadingDelete] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
   const [loadingChat, setLoadingChat] = useState(false);
 
   const LoaderOverlay = () => (
@@ -266,12 +290,13 @@ function PopupApp() {
     })
       .then((r) => r.json())
       .then((json) => {
-        setMessages((m) => [...m, { sender: 'bot', text: json.answer }]);
-        fetchAutoSuggestions(currentDocId);
-        // highlight first sentence of answer
         const firstSentence = json.answer.split(/[.?!]/)[0].slice(0, 120);
+        const anchorId = `docbot-${Date.now()}`;
+        setMessages((m) => [...m, { sender: 'bot', text: json.answer, anchorId, src: firstSentence }]);
+        fetchAutoSuggestions(currentDocId);
+        // highlight
         if (firstSentence.length > 10 && tabId) {
-          chrome.runtime.sendMessage({ type: 'docbot:highlight_text', text: firstSentence, color: '#fef3c7', tabId });
+          chrome.runtime.sendMessage({ type: 'docbot:highlight_text', text: firstSentence, color: '#fef3c7', anchorId, tabId });
         }
       })
       .catch((err) => setMessages((m) => [...m, { sender: 'system', text: `Error: ${err.message}` }]))
@@ -372,6 +397,52 @@ function PopupApp() {
     saveNote(responseText, "Chat Response");
   };
 
+  const deleteHistory = () => {
+    setLoadingDelete(true);
+    setTimeout(() => {
+      localStorage.removeItem(`docbot_session_${currentDocId}`);
+      setMessages([]);
+      setSummary("");
+      setPinnedMap({});
+      setShowDelete(false);
+      setLoadingDelete(false);
+    }, 300);
+  };
+
+  const exportChatPDF = () => {
+    const doc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
+    let y = 40;
+    doc.setFontSize(12);
+    doc.text(`Chat Session - ${new Date().toLocaleString()}`, 40, y);
+    y += 20;
+    messages.forEach(({ sender, text }) => {
+      const lines = doc.splitTextToSize(`${sender.toUpperCase()}: ${text}`, 500);
+      doc.text(lines, 40, y);
+      y += lines.length * 14 + 10;
+      if (y > 780) {
+        doc.addPage();
+        y = 40;
+      }
+    });
+    doc.save('docbot_chat.pdf');
+  };
+
+  const exportNotesPDF = () => {
+    if (notes.length === 0) { alert('No notes'); return; }
+    const doc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
+    let y = 40;
+    doc.setFontSize(12);
+    doc.text(`Doc Notes - ${new Date().toLocaleString()}`, 40, y);
+    y += 20;
+    notes.forEach((n, idx) => {
+      const lines = doc.splitTextToSize(`${idx + 1}. ${n.content}`, 500);
+      doc.text(lines, 40, y);
+      y += lines.length * 14 + 10;
+      if (y > 780) { doc.addPage(); y = 40; }
+    });
+    doc.save('docbot_notes.pdf');
+  };
+
   return (
     <div 
       className="flex flex-col h-full p-3 relative"
@@ -379,7 +450,7 @@ function PopupApp() {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {(loadingSummary || loadingHistory) && <LoaderOverlay />}
+      {(loadingSummary || loadingHistory || loadingDelete) && <LoaderOverlay />}
       {isDragging && (
         <div className="absolute inset-0 bg-purple-100 bg-opacity-90 flex items-center justify-center z-50 border-2 border-dashed border-purple-400 rounded">
           <p className="text-purple-700 text-lg font-medium">Drop PDF here to summarise</p>
@@ -388,8 +459,8 @@ function PopupApp() {
       
       <div className="pb-2 border-b border-gray-300">
         <h1 className="font-semibold text-xl text-gray-800 mb-3">DocBot</h1>
-        <div className="grid grid-cols-3 gap-1">
-          <button onClick={summarisePage} className="bg-purple-600 text-white px-3 py-1 rounded text-xs font-medium">
+        <div className="grid grid-cols-5 gap-1">
+          <button onClick={summarisePage} className="bg-purple-600 text-white px-2 py-1 rounded text-xs font-medium w-full text-center">
             Summarise Page
           </button>
           <button onClick={openFileDialog} className="bg-indigo-600 text-white px-3 py-1 rounded text-xs font-medium">
@@ -399,9 +470,9 @@ function PopupApp() {
             {showNotes ? 'Hide' : 'Notes'}
           </button>
           <button onClick={() => {
+            const sess = loadSessionFromStorage(getDocIdForPage(pageUrl));
             setLoadingHistory(true);
             setTimeout(() => {
-              const sess = loadSessionFromStorage(getDocIdForPage(pageUrl));
               if (sess) {
                 setMessages(sess.messages || []);
                 setSummary(sess.summary || "");
@@ -414,6 +485,10 @@ function PopupApp() {
           }} className="bg-sky-600 text-white px-3 py-1 rounded text-xs font-medium">
             Reload History
           </button>
+          <button onClick={exportChatPDF} className="bg-gray-700 text-white px-3 py-1 rounded text-xs font-medium">Export Chat</button>
+        </div>
+        <div className="mt-1">
+          <button onClick={() => setShowDelete(true)} className="bg-red-600 text-white px-3 py-1 rounded text-xs font-medium w-full">Clear History</button>
         </div>
         <input
           ref={fileInputRef}
@@ -423,8 +498,15 @@ function PopupApp() {
           className="hidden"
         />
         {summary && (
-          <div className="mt-3 p-3 bg-gray-50 rounded-lg border">
-            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap max-h-32 overflow-y-auto">{summary}</p>
+          <div className={`mt-3 p-3 bg-gray-50 rounded-lg border relative ${summaryExpanded?'' :'pb-6'}`}>
+            <button
+              onClick={() => setSummaryExpanded(!summaryExpanded)}
+              className="absolute -bottom-3 left-1/2 -translate-x-1/2 text-gray-600 hover:text-gray-800 text-lg leading-none"
+              title={summaryExpanded ? 'Collapse' : 'Expand'}
+            >
+              {summaryExpanded ? '▴' : '▾'}
+            </button>
+            <p className={`text-sm text-gray-700 leading-relaxed whitespace-pre-wrap ${summaryExpanded ? '' : 'max-h-32 overflow-y-auto'}`}>{summary}</p>
           </div>
         )}
         
@@ -451,8 +533,11 @@ function PopupApp() {
       {showNotes && (
         <div className="border-b border-gray-300 pb-2">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="font-medium text-sm text-gray-800">📝 Vestige Notes</h3>
-            <button onClick={() => fetchNotes(currentDocId)} className="text-xs text-gray-500 hover:text-gray-700">Refresh</button>
+            <h3 className="font-medium text-sm text-gray-800">📝 Document Notes</h3>
+            <div className="space-x-1">
+              <button onClick={() => fetchNotes(currentDocId)} className="text-xs bg-gray-200 text-gray-700 px-2 py-[2px] rounded">Refresh</button>
+              <button onClick={exportNotesPDF} className="text-xs bg-blue-200 text-blue-800 px-2 py-[2px] rounded">Export</button>
+            </div>
           </div>
           <div className="max-h-24 overflow-y-auto space-y-1">
             {notes.length === 0 ? (
@@ -470,7 +555,7 @@ function PopupApp() {
       )}
       <div className="flex-1 overflow-y-auto my-2 flex flex-col space-y-1">
         {messages.map((m, i) => (
-          <ChatMessage key={i} sender={m.sender} text={m.text} onPin={togglePin} pinned={!!pinnedMap[m.text]} />
+          <ChatMessage key={i} sender={m.sender} text={m.text} onPin={togglePin} pinned={!!pinnedMap[m.text]} anchorId={m.anchorId} tabId={tabId} />
         ))}
         <div ref={endRef} />
       </div>
@@ -486,6 +571,18 @@ function PopupApp() {
       </form>
 
       {/* API key and provider removed */}
+      {/* Delete history modal */}
+      {showDelete && (
+        <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white p-4 rounded shadow-md w-64 text-center space-y-3">
+            <p className="text-sm text-gray-800">Are you sure you want to delete history?</p>
+            <div className="flex justify-center space-x-4">
+              <button onClick={deleteHistory} className="px-3 py-1 bg-red-600 text-white text-xs rounded">Yes</button>
+              <button onClick={() => setShowDelete(false)} className="px-3 py-1 bg-gray-300 text-gray-800 text-xs rounded">No</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

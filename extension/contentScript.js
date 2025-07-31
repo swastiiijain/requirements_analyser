@@ -17,7 +17,7 @@ function extractVisibleText() {
 }
 
 // Create highlight for text
-function highlightText(text, color = '#fef08a') {
+function highlightText(text, color = '#fef08a', anchorId = null) {
   const walker = document.createTreeWalker(
     document.body,
     NodeFilter.SHOW_TEXT,
@@ -36,9 +36,10 @@ function highlightText(text, color = '#fef08a') {
       const parent = textNode.parentNode;
       if (parent.tagName === 'SCRIPT' || parent.tagName === 'STYLE') return;
       
+      const regExp = new RegExp(text.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
       const highlightedHTML = textNode.textContent.replace(
-        new RegExp(text.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
-        `<mark style="background-color: ${color}; padding: 2px 4px; border-radius: 2px;" data-docbot-highlight="true">$&</mark>`
+        regExp,
+        `<mark id="${anchorId || ''}" style="background-color: ${color}; padding: 2px 4px; border-radius: 2px; scroll-margin-top:80px" data-docbot-highlight="true">$&</mark>`
       );
       
       if (highlightedHTML !== textNode.textContent) {
@@ -63,12 +64,12 @@ function applyStoredHighlights() {
 }
 
 // Add highlight and store it
-function addHighlight(text, color = '#fef08a') {
+function addHighlight(text, color = '#fef08a', anchorId = null) {
   const existingIndex = highlights.findIndex(h => h.text === text);
   if (existingIndex === -1) {
     highlights.push({ text, color, url: window.location.href });
     localStorage.setItem('docbot_highlights', JSON.stringify(highlights));
-    highlightText(text, color);
+    highlightText(text, color, anchorId);
   }
 }
 
@@ -156,11 +157,25 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
   
   if (msg && msg.type === 'docbot:highlight_text') {
-    addHighlight(msg.text, msg.color);
+    addHighlight(msg.text, msg.color, msg.anchorId);
     sendResponse({ success: true });
     return true;
   }
+  if (msg && msg.type === 'docbot:scroll_to') {
+    const el = document.getElementById(msg.anchorId);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('docbot-pulse');
+      setTimeout(()=> el.classList.remove('docbot-pulse'), 1200);
+    }
+    return;
+  }
 });
+
+// Pulse animation style
+const style = document.createElement('style');
+style.textContent = `@keyframes docPulse{0%{box-shadow:0 0 0 0 rgba(253,230,138,0.7);}70%{box-shadow:0 0 0 10px rgba(253,230,138,0);}100%{box-shadow:0 0 0 0 rgba(253,230,138,0);}} mark.docbot-pulse{animation:docPulse 1s ease-out;}`;
+document.head.appendChild(style);
 
 // Apply highlights when page loads
 document.addEventListener('DOMContentLoaded', applyStoredHighlights);

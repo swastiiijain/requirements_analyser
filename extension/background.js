@@ -31,6 +31,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // async response
   }
 
+  // Popup requests to scroll to anchor in page
+  if (type === 'docbot:scroll_to') {
+    const { anchorId, tabId } = message;
+    chrome.tabs.sendMessage(tabId, { type: 'docbot:scroll_to', anchorId });
+    return; // no async response needed
+  }
+
   // Legacy get_summary (now just return cached text preview)
   if (type === 'docbot:get_summary') {
     const { tabId } = message;
