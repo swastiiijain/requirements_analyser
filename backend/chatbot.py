@@ -9,9 +9,9 @@ import google.generativeai as genai  # type: ignore
 load_dotenv()
 
 # Configure Gemini client using API key from environment
-api_key = os.getenv("GEMINI_API_KEY")
-if api_key:
-    genai.configure(api_key=api_key)
+API_KEY = os.getenv("GEMINI_API_KEY")
+if API_KEY:
+    genai.configure(api_key=API_KEY)
 else:
     raise EnvironmentError("GEMINI_API_KEY not found in environment variables.")
 
@@ -62,7 +62,7 @@ def summarise(text: str) -> str:
 
 def generate_auto_suggestions(text: str) -> list[str]:
     """Generate smart question suggestions based on document content."""
-    if not genai.api_key:
+    if not API_KEY:
         return ["What is this document about?", "What are the key points?", "Are there any deadlines?"]
     
     model = genai.GenerativeModel(MODEL_NAME)
@@ -86,7 +86,7 @@ def generate_auto_suggestions(text: str) -> list[str]:
 
 def explain_text(text: str, context: str = "") -> str:
     """Provide a simplified explanation of selected text."""
-    if not genai.api_key:
+    if not API_KEY:
         return "Explanation unavailable - Gemini API key missing."
     
     model = genai.GenerativeModel(MODEL_NAME)
@@ -109,7 +109,7 @@ def explain_text(text: str, context: str = "") -> str:
 
 def compare_documents(text1: str, text2: str, filename1: str, filename2: str) -> tuple[str, list[dict]]:
     """Compare two documents and return summary of changes."""
-    if not genai.api_key:
+    if not API_KEY:
         return "Comparison unavailable - Gemini API key missing.", []
     
     model = genai.GenerativeModel(MODEL_NAME)

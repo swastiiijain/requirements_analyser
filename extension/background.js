@@ -20,22 +20,56 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   // Popup requests to highlight text in active tab
   if (type === 'docbot:highlight_text') {
-    const { text, color, tabId } = message;
+    const { text, color, tabId, anchorId } = message;
     chrome.tabs.sendMessage(tabId, { 
       type: 'docbot:highlight_text', 
       text, 
-      color: color || '#fef08a' 
-    }, (response) => {
-      sendResponse(response);
-    });
+      color: color || '#fef08a', 
+      anchorId, tabId 
+    }, () => {});
     return true; // async response
   }
 
   // Popup requests to scroll to anchor in page
   if (type === 'docbot:scroll_to') {
     const { anchorId, tabId } = message;
-    chrome.tabs.sendMessage(tabId, { type: 'docbot:scroll_to', anchorId });
+    chrome.tabs.sendMessage(tabId, { type: 'docbot:scroll_to', anchorId }, ()=>{});
     return; // no async response needed
+  }
+
+  // Proxy explain request (content script cannot fetch http when page is https)
+  if (type === 'docbot:explain') {
+    const { text, context } = message;
+    (async () => {
+      try {
+        const r = await fetch('http://localhost:8000/explain', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, context }),
+        });
+        if(!r.ok){
+          throw new Error(await r.text());
+        }
+        const json = await r.json();
+        if (sender.tab?.id !== undefined) {
+          chrome.tabs.sendMessage(sender.tab.id, {
+            type: 'docbot:explain_result',
+            explanation: json.explanation,
+            selection: text,
+          }, ()=>{});
+        }
+      } catch (err) {
+        if (sender.tab && sender.tab.id !== undefined) {
+          chrome.tabs.sendMessage(sender.tab.id, {
+            type: 'docbot:explain_result',
+            explanation: `[Error] ${err.message}`,
+            selection: text,
+          }, ()=>{});
+        }
+      }
+    })();
+    sendResponse(); // keep message channel open but respond immediately
+    return true; // indicate async work
   }
 
   // Legacy get_summary (now just return cached text preview)

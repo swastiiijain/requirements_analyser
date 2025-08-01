@@ -138,7 +138,7 @@ def get_auto_suggestions(document_id: str = "default"):
 
 @app.post("/explain", response_model=ExplainResponse, tags=["chat"])
 def explain_selection(req: ExplainRequest):
-    context = session_docs.get(req.document_id, "")
+    context = session_docs.get(req.document_id or "last", "")
     explanation = chatbot.explain_text(req.text, context)
     return ExplainResponse(explanation=explanation)
 

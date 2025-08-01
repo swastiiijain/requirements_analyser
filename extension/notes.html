@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>DocBot – Notes</title>
+    <style>
+      body{font-family:system-ui,Arial,sans-serif;margin:0;padding:10px;background:#fafafa;}
+      header{display:flex;align-items:center;gap:6px;margin-bottom:10px;}
+      h1{font-size:16px;font-weight:600;margin:0;color:#111827;}
+      button{font-size:12px;padding:4px 8px;border-radius:4px;border:none;cursor:pointer;}
+      #notes{display:flex;flex-direction:column;gap:6px;max-height:420px;overflow-y:auto;}
+      .note{background:#fef9c3;border-left:3px solid #facc15;padding:4px 6px;font-size:12px;color:#4b5563;}
+      .note-title{font-weight:600;color:#b45309;}
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>📝 DocBot Notes</h1>
+      <div style="margin-left:auto;display:flex;gap:4px;">
+        <button id="refreshBtn" style="background:#e5e7eb;">Refresh</button>
+        <button id="exportBtn" style="background:#dbeafe;color:#1e40af;">Export PDF</button>
+      </div>
+    </header>
+    <div id="notes"></div>
+
+    <script src="notes.js"></script>
+  </body>
+</html> 

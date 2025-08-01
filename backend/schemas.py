@@ -48,6 +48,7 @@ class AutoSuggestionsResponse(BaseModel):
 class ExplainRequest(BaseModel):
     text: str
     context: str = ""
+    document_id: str | None = None
 
 
 class ExplainResponse(BaseModel):

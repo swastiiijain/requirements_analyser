@@ -3,6 +3,52 @@ import ReactDOM from "react-dom";
 import "./index.css";
 import { jsPDF } from "jspdf";
 
+// --- added minimalist SVG icons ---
+const RobotIcon = ({ className = "" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="4" y="7" width="16" height="11" rx="2" ry="2" />
+    <circle cx="9" cy="12" r="1.5" />
+    <circle cx="15" cy="12" r="1.5" />
+    <path d="M9 17h6M12 2v3" />
+  </svg>
+);
+// Arrow up into tray for upload
+const UploadIcon = ({ className = "" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="12 15 12 4" />
+    <polyline points="8 8 12 4 16 8" />
+    <rect x="3" y="15" width="18" height="5" rx="1" ry="1" />
+  </svg>
+);
+const NoteIcon = ({ className = "" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 2.25a.75.75 0 00-.75.75v.75h7.5V3a.75.75 0 00-.75-.75h-6z" />
+    <path d="M4.5 6h15a.75.75 0 01.75.75v12a2.25 2.25 0 01-2.25 2.25h-12A2.25 2.25 0 014.5 18.75v-12A.75.75 0 014.5 6z" />
+    <path d="M5.25 9h13.5M5.25 12.75h13.5M5.25 16.5h13.5" />
+  </svg>
+);
+const ReloadIcon = ({ className = "" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4.5 4.5a7.5 7.5 0 0113.054-2.15M19.5 4.5v5h-5" />
+    <path d="M19.5 19.5a7.5 7.5 0 01-13.054 2.15M4.5 19.5v-5h5" />
+  </svg>
+);
+// Arrow down from tray for export
+const ExportIcon = ({ className = "" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="12 9 12 20" />
+    <polyline points="16 16 12 20 8 16" />
+    <rect x="3" y="4" width="18" height="5" rx="1" ry="1" />
+  </svg>
+);
+const TrashIcon = ({ className = "" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M6 7h12" />
+    <path d="M6 7l1 12a2 2 0 002 2h6a2 2 0 002-2l1-12" />
+    <path d="M9 7V4h6v3" />
+  </svg>
+);
+
 // --- per-page helpers ---
 const makePageKey = (url) => (url || '').replace(/[#?].*$/, '');
 const getDocIdForPage = (url) => localStorage.getItem(`docbot_page_${makePageKey(url)}`) || "default";
@@ -70,12 +116,13 @@ function PopupApp() {
   const [question, setQuestion] = useState("");
   const [summary, setSummary] = useState("");
   const [summaryExpanded, setSummaryExpanded] = useState(false);
+  const [summaryVisible, setSummaryVisible] = useState(true);
   const [pinnedMap, setPinnedMap] = useState({});
   const [tabId, setTabId] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
   const [notes, setNotes] = useState([]);
-  const [showNotes, setShowNotes] = useState(false);
+
   const [pageUrl, setPageUrl] = useState("");
   const [currentDocId, setCurrentDocId] = useState("default");
   const endRef = useRef(null);
@@ -83,6 +130,45 @@ function PopupApp() {
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [loadingDelete, setLoadingDelete] = useState(false);
+
+  // helper to reload history with cleaner callback
+  const handleReloadHistory = () => {
+    const sess = loadSessionFromStorage(getDocIdForPage(pageUrl));
+    setLoadingHistory(true);
+    setTimeout(() => {
+      if (sess) {
+        setMessages(sess.messages || []);
+        setSummary(sess.summary || "");
+        setPinnedMap(sess.pinned || {});
+      } else {
+        alert('No stored history for this page');
+      }
+      setLoadingHistory(false);
+    }, 200);
+  };
+
+  // Format summary into bullet-points if multiple lines
+  const renderSummary = () => {
+    if (!summary) return null;
+    const parts = summary.split(/\n+/).map((s) => s.trim()).filter(Boolean);
+    const cleaned = parts.map(p=>p.replace(/^[*\-•\s]+/, ''));
+    if (cleaned.length > 1) {
+      const [heading, ...bullets] = cleaned;
+      return (
+        <div className={`${summaryExpanded ? '' : 'max-h-32 overflow-y-auto'} space-y-2`}>
+          <p className="text-sm text-gray-700 leading-relaxed" dangerouslySetInnerHTML={{__html: heading}}></p>
+          <ul className="list-disc pl-4 text-sm text-gray-700 leading-relaxed space-y-1">
+            {bullets.map((p, i) => (
+              <li key={i} dangerouslySetInnerHTML={{__html:p}}></li>
+            ))}
+          </ul>
+        </div>
+      );
+    }
+    return (
+      <p className={`text-sm text-gray-700 leading-relaxed whitespace-pre-wrap ${summaryExpanded ? '' : 'max-h-32 overflow-y-auto'}`}>{summary}</p>
+    );
+  };
   const [showDelete, setShowDelete] = useState(false);
   const [loadingChat, setLoadingChat] = useState(false);
 
@@ -413,8 +499,24 @@ function PopupApp() {
     const doc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
     let y = 40;
     doc.setFontSize(12);
-    doc.text(`Chat Session - ${new Date().toLocaleString()}`, 40, y);
-    y += 20;
+    doc.text(`DocBot Session - ${new Date().toLocaleString()}`, 40, y);
+    y += 30;
+    
+    // Include summary if available
+    if (summary) {
+      doc.setFontSize(10);
+      doc.text('SUMMARY:', 40, y);
+      y += 15;
+      const summaryLines = doc.splitTextToSize(summary, 500);
+      doc.text(summaryLines, 40, y);
+      y += summaryLines.length * 12 + 20;
+      
+      // Add separator
+      doc.text('CHAT HISTORY:', 40, y);
+      y += 20;
+      doc.setFontSize(12);
+    }
+    
     messages.forEach(({ sender, text }) => {
       const lines = doc.splitTextToSize(`${sender.toUpperCase()}: ${text}`, 500);
       doc.text(lines, 40, y);
@@ -458,37 +560,54 @@ function PopupApp() {
       )}
       
       <div className="pb-2 border-b border-gray-300">
-        <h1 className="font-semibold text-xl text-gray-800 mb-3">DocBot</h1>
-        <div className="grid grid-cols-5 gap-1">
-          <button onClick={summarisePage} className="bg-purple-600 text-white px-2 py-1 rounded text-xs font-medium w-full text-center">
-            Summarise Page
-          </button>
-          <button onClick={openFileDialog} className="bg-indigo-600 text-white px-3 py-1 rounded text-xs font-medium">
-            Upload PDF
-          </button>
-          <button onClick={() => setShowNotes(!showNotes)} className="bg-emerald-600 text-white px-3 py-1 rounded text-xs font-medium">
-            {showNotes ? 'Hide' : 'Notes'}
-          </button>
-          <button onClick={() => {
-            const sess = loadSessionFromStorage(getDocIdForPage(pageUrl));
-            setLoadingHistory(true);
-            setTimeout(() => {
-              if (sess) {
-                setMessages(sess.messages || []);
-                setSummary(sess.summary || "");
-                setPinnedMap(sess.pinned || {});
-              } else {
-                alert('No stored history for this page');
-              }
-              setLoadingHistory(false);
-            }, 200);
-          }} className="bg-sky-600 text-white px-3 py-1 rounded text-xs font-medium">
-            Reload History
-          </button>
-          <button onClick={exportChatPDF} className="bg-gray-700 text-white px-3 py-1 rounded text-xs font-medium">Export Chat</button>
+        <div className="flex items-center mb-2">
+          <RobotIcon className="w-6 h-6 text-purple-600 mr-2" />
+          <h1 className="font-semibold text-lg text-gray-800">DocBot</h1>
         </div>
+
+        <div className="grid grid-cols-6 gap-1">
+          {/* Summarise remains a text button for clarity */}
+          <button onClick={summarisePage} className="col-span-2 bg-purple-600 text-white px-2 py-1 rounded text-xs font-medium text-center">
+            Summarise
+          </button>
+
+          {/* Upload PDF */}
+          <button onClick={openFileDialog} className="group bg-indigo-600 text-white flex items-center justify-center px-2 py-2 rounded text-xs font-medium">
+            <UploadIcon className="w-5 h-5" />
+            <span className="hidden group-hover:inline ml-1">Upload</span>
+          </button>
+
+          {/* Notes toggle */}
+          <button onClick={() => {
+            chrome.windows.create({
+              url: `chrome-extension://${chrome.runtime.id}/notes.html?docId=${currentDocId}`,
+              type: 'popup',
+              width: 400,
+              height: 600,
+            });
+          }} className="group bg-emerald-600 text-white flex items-center justify-center px-2 py-2 rounded text-xs font-medium">
+            <NoteIcon className="w-5 h-5" />
+            <span className="hidden group-hover:inline ml-1">Notes</span>
+          </button>
+
+          {/* Reload History */}
+          <button onClick={handleReloadHistory} className="group bg-sky-600 text-white flex items-center justify-center px-2 py-2 rounded text-xs font-medium">
+            <ReloadIcon className="w-5 h-5" />
+            <span className="hidden group-hover:inline ml-1">Reload</span>
+          </button>
+
+          {/* Export Chat */}
+          <button onClick={exportChatPDF} className="group bg-gray-700 text-white flex items-center justify-center px-2 py-2 rounded text-xs font-medium">
+            <ExportIcon className="w-5 h-5" />
+            <span className="hidden group-hover:inline ml-1">Export</span>
+          </button>
+        </div>
+
         <div className="mt-1">
-          <button onClick={() => setShowDelete(true)} className="bg-red-600 text-white px-3 py-1 rounded text-xs font-medium w-full">Clear History</button>
+          <button onClick={() => setShowDelete(true)} className="group bg-red-600 text-white flex items-center justify-center px-2 py-2 rounded text-xs font-medium w-full">
+            <TrashIcon className="w-5 h-5" />
+            <span className="hidden group-hover:inline ml-1">Clear History</span>
+          </button>
         </div>
         <input
           ref={fileInputRef}
@@ -497,8 +616,17 @@ function PopupApp() {
           onChange={handleFileSelect}
           className="hidden"
         />
-        {summary && (
+        {summary && summaryVisible && (
           <div className={`mt-3 p-3 bg-gray-50 rounded-lg border relative ${summaryExpanded?'' :'pb-6'}`}>
+            {/* Close button */}
+            <button
+              onClick={() => setSummaryVisible(false)}
+              className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-xs"
+              title="Close summary"
+            >
+              ✕
+            </button>
+            {/* Expand/collapse button */}
             <button
               onClick={() => setSummaryExpanded(!summaryExpanded)}
               className="absolute -bottom-3 left-1/2 -translate-x-1/2 text-gray-600 hover:text-gray-800 text-lg leading-none"
@@ -506,59 +634,55 @@ function PopupApp() {
             >
               {summaryExpanded ? '▴' : '▾'}
             </button>
-            <p className={`text-sm text-gray-700 leading-relaxed whitespace-pre-wrap ${summaryExpanded ? '' : 'max-h-32 overflow-y-auto'}`}>{summary}</p>
+            {renderSummary()}
           </div>
         )}
         
-        {/* Auto-suggestions */}
-        {suggestions.length > 0 && (
-          <div className="mt-3">
-            <p className="text-xs text-gray-600 mb-2">💡 Suggested questions:</p>
-            <div className="space-y-1">
-              {suggestions.map((suggestion, i) => (
-                <button
-                  key={i}
-                  onClick={() => askSuggestedQuestion(suggestion)}
-                  className="block w-full text-left text-xs bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded border text-blue-700"
-                >
-                  {suggestion}
-                </button>
-              ))}
-            </div>
+        {/* Restore summary button when hidden */}
+        {summary && !summaryVisible && (
+          <div className="mt-2 flex justify-center">
+            <button
+              onClick={() => setSummaryVisible(true)}
+              className="group bg-purple-100 hover:bg-purple-200 text-purple-700 px-3 py-1 rounded-full text-xs flex items-center gap-1"
+              title="Show summary"
+            >
+              📄 <span className="hidden group-hover:inline">Summary</span>
+            </button>
           </div>
         )}
+        
+        {/* suggestions now rendered near input */}
       </div>
       
       {/* Notes Panel */}
-      {showNotes && (
-        <div className="border-b border-gray-300 pb-2">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="font-medium text-sm text-gray-800">📝 Document Notes</h3>
-            <div className="space-x-1">
-              <button onClick={() => fetchNotes(currentDocId)} className="text-xs bg-gray-200 text-gray-700 px-2 py-[2px] rounded">Refresh</button>
-              <button onClick={exportNotesPDF} className="text-xs bg-blue-200 text-blue-800 px-2 py-[2px] rounded">Export</button>
-            </div>
-          </div>
-          <div className="max-h-24 overflow-y-auto space-y-1">
-            {notes.length === 0 ? (
-              <p className="text-xs text-gray-500 italic">No notes yet. Pin responses to save them!</p>
-            ) : (
-              notes.slice(-5).map((note) => (
-                <div key={note.note_id} className="bg-yellow-50 border-l-2 border-yellow-400 px-2 py-1 text-xs">
-                  <div className="font-medium text-yellow-800">{note.topic}</div>
-                  <div className="text-gray-700 truncate">{note.content}</div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
+      {/* Removed Notes Panel as it's now an external window */}
       <div className="flex-1 overflow-y-auto my-2 flex flex-col space-y-1">
         {messages.map((m, i) => (
           <ChatMessage key={i} sender={m.sender} text={m.text} onPin={togglePin} pinned={!!pinnedMap[m.text]} anchorId={m.anchorId} tabId={tabId} />
         ))}
         <div ref={endRef} />
       </div>
+
+      {/* Compact Auto-suggestions */}
+      {suggestions.length > 0 && (
+        <div className="mb-2">
+          <div className="flex flex-wrap gap-1 py-1">
+            {suggestions.map((s, i) => (
+              <button
+                key={i}
+                onClick={() => askSuggestedQuestion(s)}
+                className="group relative text-[11px] bg-blue-50 hover:bg-blue-100 border px-2 py-1 rounded text-blue-700 max-w-[120px] truncate"
+                title={s}>
+                {s.length > 20 ? s.slice(0, 20) + '...' : s}
+                {/* Hover tooltip */}
+                <div className="absolute bottom-full left-0 mb-1 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-normal max-w-xs">
+                  {s}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleAsk} className="flex space-x-1">
         <input
