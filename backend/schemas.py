@@ -81,7 +81,9 @@ class CompareRequest(BaseModel):
 
 
 class CompareResponse(BaseModel):
-    summary: str
+    comparison_summary: str
     changes: list[dict]
+    document1_content: str
+    document2_content: str
     document1_id: str
     document2_id: str 

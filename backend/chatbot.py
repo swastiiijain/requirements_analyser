@@ -112,40 +112,70 @@ def compare_documents(text1: str, text2: str, filename1: str, filename2: str) ->
     if not API_KEY:
         return "Comparison unavailable - Gemini API key missing.", []
     
+    # Clean and normalize texts for better comparison
+    clean_text1 = text1.strip().replace('\r\n', '\n').replace('\r', '\n')
+    clean_text2 = text2.strip().replace('\r\n', '\n').replace('\r', '\n')
+    
+    print(f"[DEBUG] Text1 length: {len(clean_text1)}, Text2 length: {len(clean_text2)}")
+    print(f"[DEBUG] Texts identical: {clean_text1 == clean_text2}")
+    
+    # Enhanced change detection using difflib
+    import difflib
+    differ = difflib.unified_diff(
+        clean_text1.splitlines(keepends=True),
+        clean_text2.splitlines(keepends=True),
+        fromfile=filename1,
+        tofile=filename2,
+        lineterm="",
+        n=3  # More context lines
+    )
+    
+    changes = []
+    diff_lines = list(differ)
+    
+    for line in diff_lines:
+        if line.startswith('+++') or line.startswith('---') or line.startswith('@@'):
+            continue
+        elif line.startswith('+') and line[1:].strip():  # Only non-empty additions
+            changes.append({"type": "Addition", "text": line[1:].strip(), "description": f"Added: {line[1:].strip()[:100]}..."})
+        elif line.startswith('-') and line[1:].strip():  # Only non-empty removals
+            changes.append({"type": "Removal", "text": line[1:].strip(), "description": f"Removed: {line[1:].strip()[:100]}..."})
+    
+    print(f"[DEBUG] Found {len(changes)} changes")
+    
+    # If no changes detected, documents are identical
+    if not changes:
+        return "The two documents are identical - no differences found.", []
+    
+    # Create AI prompt with focus on actual differences
     model = genai.GenerativeModel(MODEL_NAME)
+    
+    # Create a focused comparison prompt
     prompt = (
-        f"Compare these two documents and provide:\n"
-        f"1. A summary of key differences\n"
-        f"2. What was added, removed, or changed\n\n"
-        f"Document 1 ({filename1}):\n{text1[:10000]}\n\n"
-        f"Document 2 ({filename2}):\n{text2[:10000]}"
+        f"Compare these two documents and analyze the differences:\n\n"
+        f"Document 1 ({filename1}):\n{clean_text1[:8000]}\n\n"
+        f"Document 2 ({filename2}):\n{clean_text2[:8000]}\n\n"
+        f"I detected {len(changes)} differences. Please provide:\n"
+        f"1. **Summary of Key Differences:** What are the main changes between these documents?\n"
+        f"2. **What was Added, Removed, or Changed:** Provide specific details about the differences.\n\n"
+        f"Be specific and focus on the actual content changes, not just formatting."
     )
     
     try:
         response = model.generate_content(
             prompt,
-            generation_config={"temperature": 0.3, "max_output_tokens": 600}
+            generation_config={"temperature": 0.3, "max_output_tokens": 800}
         )
         
-        # Simple change detection (can be enhanced with difflib)
-        import difflib
-        differ = difflib.unified_diff(
-            text1.splitlines(keepends=True),
-            text2.splitlines(keepends=True),
-            fromfile=filename1,
-            tofile=filename2,
-            lineterm=""
-        )
-        
-        changes = []
-        for line in differ:
-            if line.startswith('+++') or line.startswith('---') or line.startswith('@@'):
-                continue
-            elif line.startswith('+'):
-                changes.append({"type": "added", "text": line[1:].strip()})
-            elif line.startswith('-'):
-                changes.append({"type": "removed", "text": line[1:].strip()})
-        
-        return response.text.strip(), changes[:50]  # Limit changes for performance
+        summary = response.text.strip() if response.text else f"Found {len(changes)} differences between the documents."
+        return summary, changes[:50]  # Limit changes for performance
     except Exception as exc:
-        return f"[Error] {exc}", []
+        print(f"[ERROR] Gemini API error: {exc}")
+        # Fallback summary if AI fails
+        fallback_summary = f"Found {len(changes)} differences:\n"
+        for i, change in enumerate(changes[:5]):
+            fallback_summary += f"• {change['type']}: {change['description']}\n"
+        if len(changes) > 5:
+            fallback_summary += f"... and {len(changes) - 5} more changes"
+        
+        return fallback_summary, changes[:50]

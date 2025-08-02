@@ -6,6 +6,8 @@ load_dotenv()
 
 from fastapi import Depends, FastAPI, Header, HTTPException, status, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
+import io
+import pdfplumber
 
 from backend import auth as auth_utils
 from backend import chatbot
@@ -195,22 +197,71 @@ def delete_note(note_id: str):
 
 
 @app.post("/compare", response_model=CompareResponse, tags=["document"])
-async def compare_documents_endpoint(req: CompareRequest):
-    summary, changes = chatbot.compare_documents(
-        req.text1, req.text2, req.filename1, req.filename2
-    )
-    
-    import uuid
-    doc1_id = str(uuid.uuid4())
-    doc2_id = str(uuid.uuid4())
-    
-    # Store comparison for later reference
-    session_docs[f"compare_{doc1_id}"] = req.text1
-    session_docs[f"compare_{doc2_id}"] = req.text2
-    
-    return CompareResponse(
-        summary=summary,
-        changes=changes,
-        document1_id=doc1_id,
-        document2_id=doc2_id
-    ) 
+async def compare_documents_endpoint(
+    document1: UploadFile = File(...),
+    document2: UploadFile = File(...)
+):
+    try:
+        # Read and extract text from both documents
+        content1 = await document1.read()
+        content2 = await document2.read()
+        
+        # Extract text from document 1
+        if document1.filename.endswith('.pdf'):
+            with io.BytesIO(content1) as pdf_buffer:
+                with pdfplumber.open(pdf_buffer) as pdf:
+                    text1 = "\n".join([page.extract_text() or "" for page in pdf.pages])
+        elif document1.filename.endswith(('.docx', '.doc')):
+            from docx import Document
+            with io.BytesIO(content1) as docx_buffer:
+                doc = Document(docx_buffer)
+                text1 = "\n".join([paragraph.text for paragraph in doc.paragraphs])
+        elif document1.filename.endswith('.txt'):
+            text1 = content1.decode('utf-8')
+        else:
+            raise HTTPException(status_code=400, detail=f"Unsupported file type for document 1: {document1.filename}")
+            
+        # Extract text from document 2
+        if document2.filename.endswith('.pdf'):
+            with io.BytesIO(content2) as pdf_buffer:
+                with pdfplumber.open(pdf_buffer) as pdf:
+                    text2 = "\n".join([page.extract_text() or "" for page in pdf.pages])
+        elif document2.filename.endswith(('.docx', '.doc')):
+            from docx import Document
+            with io.BytesIO(content2) as docx_buffer:
+                doc = Document(docx_buffer)
+                text2 = "\n".join([paragraph.text for paragraph in doc.paragraphs])
+        elif document2.filename.endswith('.txt'):
+            text2 = content2.decode('utf-8')
+        else:
+            raise HTTPException(status_code=400, detail=f"Unsupported file type for document 2: {document2.filename}")
+            
+        if not text1.strip():
+            raise HTTPException(status_code=400, detail="Document 1 appears to be empty or unreadable")
+        if not text2.strip():
+            raise HTTPException(status_code=400, detail="Document 2 appears to be empty or unreadable")
+        
+        # Compare documents
+        summary, changes = chatbot.compare_documents(
+            text1, text2, document1.filename, document2.filename
+        )
+        
+        import uuid
+        doc1_id = str(uuid.uuid4())
+        doc2_id = str(uuid.uuid4())
+        
+        # Store comparison for later reference
+        session_docs[f"compare_{doc1_id}"] = text1
+        session_docs[f"compare_{doc2_id}"] = text2
+        
+        return CompareResponse(
+            comparison_summary=summary,
+            changes=changes,
+            document1_content=text1,
+            document2_content=text2,
+            document1_id=doc1_id,
+            document2_id=doc2_id
+        )
+    except Exception as e:
+        print(f"Compare error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to compare documents: {str(e)}") 

@@ -48,6 +48,16 @@ const TrashIcon = ({ className = "" }) => (
     <path d="M9 7V4h6v3" />
   </svg>
 );
+const CompareIcon = ({ className = "" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="3" width="8" height="16" rx="1" ry="1" />
+    <rect x="14" y="3" width="8" height="16" rx="1" ry="1" />
+    <line x1="6" y1="8" x2="6" y2="12" />
+    <line x1="18" y1="8" x2="18" y2="12" />
+  </svg>
+);
+
+
 
 // --- per-page helpers ---
 const makePageKey = (url) => (url || '').replace(/[#?].*$/, '');
@@ -130,6 +140,11 @@ function PopupApp() {
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [loadingDelete, setLoadingDelete] = useState(false);
+  const [showCompareModal, setShowCompareModal] = useState(false);
+  const [compareFile1, setCompareFile1] = useState(null);
+  const [compareFile2, setCompareFile2] = useState(null);
+  const [loadingCompare, setLoadingCompare] = useState(false);
+  const [comparisonHistory, setComparisonHistory] = useState([]);
 
   // helper to reload history with cleaner callback
   const handleReloadHistory = () => {
@@ -254,6 +269,31 @@ function PopupApp() {
       setPinnedMap({});
     }
   }, [currentDocId]);
+
+  // Load comparison history on mount
+  useEffect(() => {
+    // Try chrome.storage first, then fallback to localStorage
+    chrome.storage.local.get(['docbot_comparison_history'], (result) => {
+      if (result.docbot_comparison_history && result.docbot_comparison_history.length > 0) {
+        setComparisonHistory(result.docbot_comparison_history);
+      } else {
+        // Fallback to localStorage
+        const savedHistory = localStorage.getItem('docbot_comparison_history');
+        if (savedHistory) {
+          try {
+            const history = JSON.parse(savedHistory);
+            setComparisonHistory(history);
+            // Migrate to chrome.storage
+            if (history.length > 0) {
+              chrome.storage.local.set({ 'docbot_comparison_history': history });
+            }
+          } catch (e) {
+            console.error('Failed to load comparison history:', e);
+          }
+        }
+      }
+    });
+  }, []);
 
   // Modify summarisePage loading behaviour
   const summarisePage = () => {
@@ -545,6 +585,149 @@ function PopupApp() {
     doc.save('docbot_notes.pdf');
   };
 
+  const handleCompareDocuments = async () => {
+    if (!compareFile1 || !compareFile2) {
+      alert('Please select both documents to compare');
+      return;
+    }
+
+    setLoadingCompare(true);
+    try {
+      // Create new File objects to avoid file lock issues
+      const file1Buffer = await compareFile1.arrayBuffer();
+      const file2Buffer = await compareFile2.arrayBuffer();
+      
+      const newFile1 = new File([file1Buffer], compareFile1.name, { 
+        type: compareFile1.type,
+        lastModified: Date.now()
+      });
+      const newFile2 = new File([file2Buffer], compareFile2.name, { 
+        type: compareFile2.type,
+        lastModified: Date.now()
+      });
+
+      const formData = new FormData();
+      formData.append('document1', newFile1);
+      formData.append('document2', newFile2);
+
+      const response = await fetch('http://localhost:8000/compare', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to compare documents');
+      }
+
+      const result = await response.json();
+      
+      // Open comparison in new tab
+      const comparisonData = {
+        summary: result.comparison_summary,
+        document1: {
+          name: compareFile1.name,
+          content: result.document1_content
+        },
+        document2: {
+          name: compareFile2.name,
+          content: result.document2_content
+        },
+        changes: result.changes || []
+      };
+
+      // Store comparison data in chrome.storage with a unique key
+      const comparisonId = 'comparison_' + Date.now();
+      const storageData = {
+        [comparisonId]: comparisonData,
+        [`${comparisonId}_metadata`]: {
+          created: Date.now(),
+          file1Name: compareFile1.name,
+          file2Name: compareFile2.name,
+          summary: result.comparison_summary.substring(0, 100) + '...'
+        }
+      };
+      
+      chrome.storage.local.set(storageData, () => {
+        // Add to comparison history
+        const historyItem = {
+          id: comparisonId,
+          timestamp: new Date().toLocaleString(),
+          file1Name: compareFile1.name,
+          file2Name: compareFile2.name,
+          summary: result.comparison_summary.substring(0, 100) + '...'
+        };
+        
+        const updatedHistory = [historyItem, ...comparisonHistory.slice(0, 9)]; // Keep last 10
+        setComparisonHistory(updatedHistory);
+        localStorage.setItem('docbot_comparison_history', JSON.stringify(updatedHistory));
+        
+        // Also store in chrome.storage for better persistence
+        chrome.storage.local.set({ 'docbot_comparison_history': updatedHistory });
+        
+        // Create comparison tab with just the ID
+        chrome.tabs.create({
+          url: `chrome-extension://${chrome.runtime.id}/comparison.html?id=${comparisonId}`
+        });
+      });
+
+      // Reset modal
+      setShowCompareModal(false);
+      setCompareFile1(null);
+      setCompareFile2(null);
+    } catch (error) {
+      console.error('Compare error:', error);
+      let errorMessage = 'Failed to compare documents.\n\n';
+      
+      if (error.message.includes('file is in use') || error.message.includes('file that\'s open') || error.name === 'NotAllowedError') {
+        errorMessage += '📁 File Access Issue:\n';
+        errorMessage += '• Close the files in Word, Excel, or any other program\n';
+        errorMessage += '• Try renaming the files with different names\n';
+        errorMessage += '• Copy the files to your Desktop and try again\n';
+        errorMessage += '• Make sure the files are not read-only\n\n';
+        errorMessage += '💡 Alternative: Try exporting/saving the files as PDF first, then compare the PDFs.';
+      } else if (error.message.includes('permission') || error.message.includes('access')) {
+        errorMessage += 'Permission denied. Please check file permissions and try again.';
+      } else if (error.message.includes('Unsupported file type')) {
+        errorMessage += error.message;
+      } else if (error.message.includes('NetworkError') || error.message.includes('fetch')) {
+        errorMessage += 'Network error. Please ensure the backend server is running on http://localhost:8000';
+      } else {
+        errorMessage += error.message;
+      }
+      
+      alert(errorMessage);
+    } finally {
+      setLoadingCompare(false);
+    }
+  };
+
+  const reopenComparison = (historyItem) => {
+    console.log('Reopening comparison:', historyItem.id);
+    
+    // Check if comparison data still exists in chrome.storage
+    chrome.storage.local.get([historyItem.id, `${historyItem.id}_metadata`], (result) => {
+      console.log('Storage result:', result);
+      
+      if (result[historyItem.id]) {
+        // Data exists, open comparison tab
+        console.log('Opening comparison tab');
+        chrome.tabs.create({
+          url: `chrome-extension://${chrome.runtime.id}/comparison.html?id=${historyItem.id}`
+        });
+      } else {
+        // Data expired, show message
+        console.log('Comparison data not found');
+        alert(`This comparison (${historyItem.file1Name} vs ${historyItem.file2Name}) is no longer available. Please run a new comparison.`);
+        
+        // Remove from history
+        const updatedHistory = comparisonHistory.filter(item => item.id !== historyItem.id);
+        setComparisonHistory(updatedHistory);
+        localStorage.setItem('docbot_comparison_history', JSON.stringify(updatedHistory));
+        chrome.storage.local.set({ 'docbot_comparison_history': updatedHistory });
+      }
+    });
+  };
+
   return (
     <div 
       className="flex flex-col h-full p-3 relative"
@@ -565,7 +748,7 @@ function PopupApp() {
           <h1 className="font-semibold text-lg text-gray-800">DocBot</h1>
         </div>
 
-        <div className="grid grid-cols-6 gap-1">
+        <div className="grid grid-cols-7 gap-1">
           {/* Summarise remains a text button for clarity */}
           <button onClick={summarisePage} className="col-span-2 bg-purple-600 text-white px-2 py-1 rounded text-xs font-medium text-center">
             Summarise
@@ -575,6 +758,12 @@ function PopupApp() {
           <button onClick={openFileDialog} className="group bg-indigo-600 text-white flex items-center justify-center px-2 py-2 rounded text-xs font-medium">
             <UploadIcon className="w-5 h-5" />
             <span className="hidden group-hover:inline ml-1">Upload</span>
+          </button>
+
+          {/* Compare Documents */}
+          <button onClick={() => setShowCompareModal(true)} className="group bg-orange-600 text-white flex items-center justify-center px-2 py-2 rounded text-xs font-medium relative overflow-hidden">
+            <CompareIcon className="w-5 h-5 group-hover:hidden" />
+            <span className="hidden group-hover:block text-center whitespace-nowrap">Compare</span>
           </button>
 
           {/* Notes toggle */}
@@ -707,6 +896,106 @@ function PopupApp() {
           </div>
         </div>
       )}
+
+      {/* Compare Documents Modal */}
+      {showCompareModal && (
+        <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white p-4 rounded shadow-lg w-96 space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-semibold text-gray-800">Compare Documents</h3>
+              <button onClick={() => setShowCompareModal(false)} className="text-gray-500 hover:text-gray-700">✕</button>
+            </div>
+            
+            <div className="bg-blue-50 p-3 rounded text-sm text-blue-800">
+              <p><strong>How to use:</strong></p>
+              <p>• Upload two versions of the same document (PDF, Word, or text files)</p>
+              <p>• The system will compare them and show changes side-by-side</p>
+              <p>• Changes will be highlighted and summarized</p>
+            </div>
+            
+            <div className="bg-yellow-50 p-3 rounded text-sm text-yellow-800">
+              <p><strong>⚠️ Important:</strong></p>
+              <p>• Close files in Word/Excel before uploading</p>
+              <p>• If you get "file in use" errors, copy files to Desktop first</p>
+              <p>• PDF files work best for comparison</p>
+            </div>
+            
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Document 1 (Original Version)</label>
+                <input
+                  type="file"
+                  accept=".pdf,.docx,.txt,.doc"
+                  onChange={(e) => setCompareFile1(e.target.files[0])}
+                  className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                />
+                <p className="text-xs text-gray-500 mt-1">Supported: PDF, Word (.docx, .doc), Text (.txt)</p>
+                {compareFile1 && <p className="text-xs text-green-600 mt-1">✓ {compareFile1.name}</p>}
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Document 2 (Updated Version)</label>
+                <input
+                  type="file"
+                  accept=".pdf,.docx,.txt,.doc"
+                  onChange={(e) => setCompareFile2(e.target.files[0])}
+                  className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                />
+                <p className="text-xs text-gray-500 mt-1">Supported: PDF, Word (.docx, .doc), Text (.txt)</p>
+                {compareFile2 && <p className="text-xs text-green-600 mt-1">✓ {compareFile2.name}</p>}
+              </div>
+            </div>
+            
+            {/* Comparison History - Always show when modal is open */}
+            <div className="border-t pt-3">
+              <h4 className="text-sm font-medium text-gray-700 mb-2">
+                Recent Comparisons {comparisonHistory.length > 0 && `(${comparisonHistory.length})`}
+              </h4>
+              {comparisonHistory.length === 0 ? (
+                <p className="text-gray-500 text-xs py-2">No comparison history yet. Your comparisons will appear here.</p>
+              ) : (
+                <div className="max-h-32 overflow-y-auto space-y-1">
+                  {comparisonHistory.map((item, index) => (
+                    <div 
+                      key={item.id}
+                      onClick={() => reopenComparison(item)}
+                      className="flex items-center justify-between p-2 bg-gray-50 rounded text-xs cursor-pointer hover:bg-gray-100 transition-colors"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-800 truncate">
+                          {item.file1Name} ↔ {item.file2Name}
+                        </p>
+                        <p className="text-gray-500 text-xs">{item.timestamp}</p>
+                      </div>
+                      <div className="ml-2 text-blue-600 hover:text-blue-800">
+                        📄
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            <div className="flex justify-end space-x-2 pt-2">
+              <button 
+                onClick={() => setShowCompareModal(false)} 
+                className="px-3 py-1 bg-gray-300 text-gray-800 text-sm rounded"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleCompareDocuments}
+                disabled={!compareFile1 || !compareFile2 || loadingCompare}
+                className="px-3 py-1 bg-orange-600 text-white text-sm rounded disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loadingCompare ? 'Comparing...' : 'Compare'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
     </div>
   );
 }
