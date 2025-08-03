@@ -40,7 +40,7 @@ def ask(question: str, context: str) -> str:
         )
         return response.text.strip()
     except Exception as exc:  # pragma: no cover
-        return f"[Gemini error] {exc}"
+        return f"[Gemini error] {exc}" 
 
 
 def summarise(text: str) -> str:

@@ -40,7 +40,7 @@
     const list = json.notes||[];
     if(list.length===0){ alert('No notes'); return; }
     const { jsPDF } = await import(chrome.runtime.getURL('dist/vendor.js')).catch(()=>({}));
-    if(!jsPDF){ alert('jsPDF not available'); return; }
+    if(!jsPDF){ alert('Export Notes functionality will be implemented in the next phase.'); return; }
     const doc = new jsPDF({orientation:'p',unit:'pt',format:'a4'});
     let y=40;
     doc.setFontSize(12);
