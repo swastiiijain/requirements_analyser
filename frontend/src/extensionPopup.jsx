@@ -121,6 +121,22 @@ function ChatMessage({ sender, text, onPin, pinned, anchorId, tabId }) {
   );
 }
 
+// Typing indicator for extension popup
+function TypingIndicator() {
+  return (
+    <div className="max-w-[90%] px-3 py-2 rounded shadow text-sm bg-gray-200 text-gray-700">
+      <div className="flex items-center space-x-2">
+        <span>DocBot is thinking</span>
+        <div className="flex space-x-1">
+          <div className="w-1 h-1 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+          <div className="w-1 h-1 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+          <div className="w-1 h-1 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PopupApp() {
   const [messages, setMessages] = useState([]);
   const [question, setQuestion] = useState("");
@@ -849,6 +865,7 @@ function PopupApp() {
         {messages.map((m, i) => (
           <ChatMessage key={i} sender={m.sender} text={m.text} onPin={togglePin} pinned={!!pinnedMap[m.text]} anchorId={m.anchorId} tabId={tabId} />
         ))}
+        {loadingChat && <TypingIndicator />}
         <div ref={endRef} />
       </div>
 

@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import ChatMessage from '../components/ChatMessage';
+import ChatMessage, { TypingIndicator } from '../components/ChatMessage';
 
 function Chat({ token, onLogout }) {
   const [question, setQuestion] = useState('');
   const [messages, setMessages] = useState([]);
   const [currentFile, setCurrentFile] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
 
   const headers = {
     'Content-Type': 'application/json',
@@ -41,6 +42,7 @@ function Chat({ token, onLogout }) {
     const q = question.trim();
     setQuestion('');
     setMessages((msgs) => [...msgs, { sender: 'user', text: q }]);
+    setIsTyping(true);
     try {
       const res = await fetch('http://localhost:8000/ask', {
         method: 'POST',
@@ -54,6 +56,8 @@ function Chat({ token, onLogout }) {
       setMessages((msgs) => [...msgs, { sender: 'bot', text: data.answer }]);
     } catch (err) {
       setMessages((msgs) => [...msgs, { sender: 'system', text: `Error: ${err.message}` }]);
+    } finally {
+      setIsTyping(false);
     }
   };
 
@@ -82,6 +86,7 @@ function Chat({ token, onLogout }) {
         {messages.map((m, idx) => (
           <ChatMessage key={idx} sender={m.sender} text={m.text} />
         ))}
+        {isTyping && <TypingIndicator />}
       </div>
       <form onSubmit={ask} className="p-4 bg-white flex">
         <input

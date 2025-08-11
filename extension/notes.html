@@ -11,6 +11,11 @@
       #notes{display:flex;flex-direction:column;gap:6px;max-height:420px;overflow-y:auto;}
       .note{background:#fef9c3;border-left:3px solid #facc15;padding:4px 6px;font-size:12px;color:#4b5563;}
       .note-title{font-weight:600;color:#b45309;}
+      /* Modal overlay styles */
+      #modalOverlay{position:fixed;inset:0;background:rgba(0,0,0,.3);display:none;align-items:center;justify-content:center;z-index:1000;}
+      #modalBox{background:#fff;border-radius:8px;padding:16px 20px;max-width:320px;width:90%;box-shadow:0 4px 12px rgba(0,0,0,.15);position:relative;}
+      #modalClose{position:absolute;top:6px;right:8px;font-size:16px;line-height:16px;background:none;border:none;cursor:pointer;color:#6b7280;}
+      #modalMessage{font-size:14px;color:#111827;max-width:100%;overflow-wrap:break-word;}
     </style>
   </head>
   <body>
@@ -22,6 +27,14 @@
       </div>
     </header>
     <div id="notes"></div>
+
+    <!-- Custom modal for alerts -->
+    <div id="modalOverlay">
+      <div id="modalBox">
+        <button id="modalClose">&times;</button>
+        <p id="modalMessage"></p>
+      </div>
+    </div>
 
     <script src="notes.js"></script>
   </body>

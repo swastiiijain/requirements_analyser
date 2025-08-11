@@ -7,6 +7,21 @@
   const refreshBtn = document.getElementById('refreshBtn');
   const exportBtn = document.getElementById('exportBtn');
 
+  // Modal elements for custom alert
+  const modalOverlay = document.getElementById('modalOverlay');
+  const modalMessage = document.getElementById('modalMessage');
+  const modalClose = document.getElementById('modalClose');
+
+  function showModal(message){
+    modalMessage.textContent = message;
+    modalOverlay.style.display = 'flex';
+  }
+
+  modalClose.addEventListener('click', () => modalOverlay.style.display = 'none');
+  modalOverlay.addEventListener('click', (e) => {
+    if(e.target === modalOverlay){ modalOverlay.style.display = 'none'; }
+  });
+
   async function fetchNotes(){
     notesEl.innerHTML = '<p style="font-size:12px;color:#6b7280;">Loading…</p>';
     try{
@@ -38,9 +53,9 @@
     const r = await fetch(`http://localhost:8000/notes?document_id=${docId}`);
     const json = await r.json();
     const list = json.notes||[];
-    if(list.length===0){ alert('No notes'); return; }
+    if(list.length===0){ showModal('No notes'); return; }
     const { jsPDF } = await import(chrome.runtime.getURL('dist/vendor.js')).catch(()=>({}));
-    if(!jsPDF){ alert('Export Notes functionality will be implemented in the next phase.'); return; }
+    if(!jsPDF){ showModal('Export Notes functionality will be implemented in the next phase.'); return; }
     const doc = new jsPDF({orientation:'p',unit:'pt',format:'a4'});
     let y=40;
     doc.setFontSize(12);
