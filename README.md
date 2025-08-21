@@ -32,7 +32,7 @@ This project provides a local chatbot capable of answering questions about the *
 3. **Set environment variables** (at minimum the OpenAI key and JWT secret):
 
    ```powershell
-   setx OPENAI_API_KEY "sk-..."
+   setx GEMINI_API_KEY "sk-..."
    setx JWT_SECRET "choose-a-strong-secret"
    ```
 
