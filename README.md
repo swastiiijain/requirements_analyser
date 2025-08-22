@@ -90,8 +90,11 @@ DocBot helps developers, researchers, and teams quickly extract key information 
 
 4. **Set up environment variables**:
    ```powershell
-   setx GEMINI_API_KEY "sk-..."
-   setx JWT_SECRET "choose-a-strong-secret"
+   # Set your Gemini API key
+   setx GEMINI_API_KEY "your-gemini-api-key-here"
+   
+   # Set JWT secret for authentication
+   setx JWT_SECRET "choose-a-strong-secret-key"
    ```
 
 5. **Run the backend server**:
