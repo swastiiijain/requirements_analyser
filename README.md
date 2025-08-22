@@ -1,69 +1,272 @@
-# requirements_analyser
-DocBot - Intelligent Document Analysis Chatbot
+# DocBot - Intelligent Document Analysis Chatbot
 
-A desktop based AI assistant that reads and analyzes open word, excel or PDF documents in real-time. Designed to help developers and teams quickly extract key information from lengthy requirement documents without manually scanning through them. With just a click, the chatbot integrates with your system, access the open document, and allows you to query it conversationally - saving time and improving focus on development tasks.
+**A powerful AI-powered document analysis system that reads and analyzes Word, Excel, PDF documents, and web content in real-time.**
 
-Key Features
+DocBot helps developers, researchers, and teams quickly extract key information from lengthy documents without manually scanning through them. With an intuitive chat interface and browser extension, you can query documents conversationally and get instant insights.
 
-Supports Word (.docx), Excel(.xlsx) and PDF files
-Natural language chatbot interface for querying documents
-Highlights key requirements, use cases and action points
-Built with python, LLMs, and desktop automation tools
+## 🚀 Key Features
 
-# Secure Document Chatbot
+### 📄 Document Processing
+- **Multiple Format Support**: Word (.docx), Excel (.xlsx), PDF files, and web content
+- **Real-time Analysis**: Automatically detect and process active documents on Windows
+- **Text Extraction**: Advanced text extraction with support for complex document structures
+- **Document Upload**: Direct file upload via web interface and browser extension
+- **Document Comparison**: Side-by-side comparison of two documents with AI-powered change analysis
 
-This project provides a local chatbot capable of answering questions about the **currently active Word, Excel, or PDF document** on your Windows machine.
+### 🤖 AI-Powered Chat Interface
+- **Natural Language Queries**: Ask questions about documents in plain English
+- **Context-Aware Responses**: AI understands document context and provides relevant answers
+- **Auto-suggestions**: Smart question suggestions based on document content
+- **Text Explanation**: Select any text to get simplified explanations
+- **Conversation History**: Maintains chat history per document session
 
-## Quickstart (Backend)
+### 🌐 Browser Extension (DocBot)
+- **Web Document Analysis**: Works with Google Docs, Word Online, PDF viewers, and any web content
+- **Text Highlighting**: Highlight important sections with visual markers
+- **In-page Chat**: Chat overlay directly on web pages
+- **Document Notes**: Save and organize notes with timestamps and topics
+- **Export Capabilities**: Export notes and comparisons to PDF
+- **Cross-platform Support**: Chrome and Edge compatible (Manifest V3)
 
-1. **Create & activate a Python virtual environment** (optional but recommended):
+### 🔐 Security & Authentication
+- **JWT-based Authentication**: Secure token-based authentication system
+- **Local Processing**: Documents processed locally for privacy
+- **CORS Support**: Configured for local development and extension integration
+- **Environment Variables**: Secure API key management
 
+### 💻 Modern Tech Stack
+
+#### Backend (Python/FastAPI)
+- **FastAPI**: High-performance web framework with automatic API documentation
+- **Google Gemini AI**: Advanced AI capabilities with `gemini-2.0-flash` model
+- **Document Libraries**: 
+  - `python-docx` for Word documents
+  - `openpyxl` for Excel files
+  - `pdfplumber` for PDF processing
+- **Windows Integration**: 
+  - `pygetwindow` for window detection
+  - `pywin32` for COM automation
+  - `psutil` for process management
+- **Security**: `passlib` with bcrypt for password hashing, `PyJWT` for tokens
+
+#### Frontend (React/Vite)
+- **React 18**: Modern React with hooks and functional components
+- **Vite**: Fast build tool and development server
+- **Tailwind CSS**: Utility-first CSS framework with form components
+- **Responsive Design**: Mobile-friendly interface
+
+#### Browser Extension
+- **Manifest V3**: Latest Chrome extension standards
+- **Content Security Policy**: Secure extension permissions
+- **Service Worker**: Background processing for document analysis
+- **Storage API**: Persistent storage for notes and highlights
+
+## 🛠️ Installation & Setup
+
+### Prerequisites
+- **Python 3.8+**
+- **Node.js 16+** (for frontend development)
+- **Windows OS** (for desktop document detection features)
+- **Google Gemini API Key**
+
+### Backend Setup
+
+1. **Clone the repository**:
+   ```powershell
+   git clone <repository-url>
+   cd docbot
+   ```
+
+2. **Create and activate Python virtual environment**:
    ```powershell
    python -m venv .venv
    .venv\Scripts\activate
    ```
 
-2. **Install dependencies**:
-
+3. **Install Python dependencies**:
    ```powershell
    pip install -r requirements.txt
    ```
 
-3. **Set environment variables** (at minimum the OpenAI key and JWT secret):
-
+4. **Set up environment variables**:
    ```powershell
    setx GEMINI_API_KEY "sk-..."
    setx JWT_SECRET "choose-a-strong-secret"
    ```
 
-4. **Run the backend**:
-
+5. **Run the backend server**:
    ```powershell
    uvicorn backend.main:app --reload
    ```
 
-The API will be available at `http://localhost:8000`. Use the automatically generated docs at `http://localhost:8000/docs` to explore the endpoints during development.
+   The API will be available at `http://localhost:8000` with interactive docs at `http://localhost:8000/docs`
+
+### 🌐 Azure Cloud Deployment
+
+**Production URL**: [https://cts-vibeappau3702-2.azurewebsites.net](https://cts-vibeappau3702-2.azurewebsites.net)
+
+DocBot is deployed on Azure App Service for production use. The browser extension automatically uses this deployed endpoint as the default API base, with fallback to localhost for development.
+
+#### Key Features of Azure Deployment:
+- **Auto-scaling**: Handles variable user loads automatically
+- **Global availability**: Accessible from anywhere with internet connection
+- **SSL/HTTPS**: Secure encrypted connections
+- **Integrated monitoring**: Built-in health checks and logging
+- **CI/CD pipeline**: Automated deployment from repository updates
+
+The extension intelligently switches between:
+1. Custom API URL (if configured in extension settings)
+2. **Production Azure URL** (default): `https://cts-vibeappau3702-2.azurewebsites.net`
+3. Local development URL: `http://localhost:8000`
+
+### Frontend Setup (Optional - for web interface)
+
+1. **Navigate to frontend directory**:
+   ```powershell
+   cd frontend
+   ```
+
+2. **Install dependencies**:
+   ```powershell
+   npm install
+   ```
+
+3. **Start development server**:
+   ```powershell
+   npm run dev
+   ```
+
+   The web interface will be available at `http://localhost:5173`
+
+### Browser Extension Setup
+
+1. **Get a Gemini API key** from [Google AI Studio](https://makersuite.google.com/app/apikey)
+
+2. **Load the extension**:
+   - Open Chrome/Edge and go to `chrome://extensions` or `edge://extensions`
+   - Enable "Developer mode"
+   - Click "Load unpacked" and select the `extension/` directory
+
+3. **Configure the extension**:
+   - Click the DocBot icon in the toolbar
+   - Navigate to any web document (Google Docs, PDFs, etc.)
+   - Click "Load Document" to extract text
+   - Enter your Gemini API key when prompted
+   - Start chatting about the document!
+
+## 📖 Usage Guide
+
+### Desktop Application
+1. **Authentication**: Login with default credentials (`admin`/`password`)
+2. **Load Document**: Click "Read Active Document" to analyze the currently open Word/Excel/PDF file
+3. **Chat**: Ask questions about the document content
+4. **Get Insights**: Use auto-generated suggestions for common queries
+
+### Browser Extension
+1. **Load Content**: Navigate to any web document and click "Load Document"
+2. **Chat Interface**: Use the popup chat to ask questions about the page content
+3. **Text Selection**: Select any text on the page for instant explanations
+4. **Highlighting**: Highlight important sections for later reference
+5. **Notes**: Save notes with topics and timestamps
+6. **Document Comparison**: Upload two documents to see detailed comparisons
+
+### API Endpoints
+
+#### Authentication
+- `POST /auth` - Login and get JWT token
+
+#### Document Processing
+- `POST /read-doc` - Read active desktop document
+- `POST /upload` - Upload PDF for analysis
+- `POST /summarise` - Generate document summary
+- `POST /compare` - Compare two documents
+
+#### Chat & Analysis
+- `POST /ask` - Ask questions about loaded documents
+- `POST /auto-suggestions` - Get smart question suggestions
+- `POST /explain` - Get explanations for selected text
+
+#### Notes Management
+- `POST /notes` - Save a new note
+- `GET /notes` - Retrieve saved notes
+- `DELETE /notes/{note_id}` - Delete a specific note
+
+## 🔧 Configuration
+
+### Environment Variables
+```bash
+GEMINI_API_KEY=your-gemini-api-key    # Required: Google Gemini AI API key
+JWT_SECRET=your-jwt-secret            # Required: Secret for JWT token signing
+```
+
+### Default Credentials
+- **Username**: `admin`
+- **Password**: `password`
+
+⚠️ **Important**: Change the default password after first login for production use.
+
+## 🌟 Advanced Features
+
+### Document Comparison
+- Upload two documents to see detailed side-by-side comparison
+- AI-powered analysis highlights key differences
+- Visual indicators for additions, deletions, and modifications
+- Export comparison results
+
+### Smart Suggestions
+- Context-aware question generation based on document content
+- Focuses on deadlines, risks, decisions, and requirements
+- Helps users discover important information they might miss
+
+### Text Highlighting & Annotations
+- Highlight important text sections in web documents
+- Persistent highlights across page refreshes
+- Color-coded highlighting system
+- Export highlighted content
+
+### Notes System
+- Save important insights with timestamps
+- Organize notes by topics and documents
+- Export notes to PDF format
+- Search and filter notes
+
+## 🔒 Privacy & Security
+
+- **Local Processing**: Documents are processed locally on your machine
+- **No Data Storage**: Document content is not permanently stored
+- **Secure Authentication**: JWT-based authentication with bcrypt password hashing
+- **API Security**: Gemini API calls only when explicitly requested
+- **Extension Permissions**: Minimal required permissions for browser extension
+
+## 🚀 Development
+
+### Building the Frontend
+```bash
+cd frontend
+npm run build
+```
+
+### Running Tests
+```bash
+# Backend tests
+python -m pytest
+
+# Frontend tests
+cd frontend
+npm test
+```
+
+### Contributing
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
+## 🤝 Support
+
+For support, feature requests, or bug reports, please open an issue on the GitHub repository.
 
 ---
 
-Frontend and further instructions will follow.
-
-## Browser Extension (DocBot)
-
-A Manifest V3 Chrome/Edge extension is provided in the `extension/` folder. It contains:
-
-* `manifest.json` – extension metadata and permissions
-* `background.js` – service-worker that stores scraped page text and proxies chat queries to OpenAI
-* `contentScript.js` – injected into every tab to collect visible text (and PDF text via the browser viewer)
-* `popup.html` + `popup.js` – React + Tailwind chat UI that appears when you click the toolbar icon
-
-### Quick start
-
-1. Create an OpenAI API key and keep it handy.
-2. In Chrome/Edge, open `chrome://extensions` (or `edge://extensions`), enable *Developer mode* and click *Load unpacked*.
-3. Select the `extension/` directory of this repo. The DocBot icon should appear in the toolbar.
-4. Navigate to any online document (Google Docs, Word Online, PDFs, etc.) and click the icon.
-5. Press **Load Document** to extract the visible text. A short summary will be shown.
-6. Paste your OpenAI API key, save it, then start chatting about the document!
-
-No data ever leaves your machine except when you explicitly ask a question – only then do the *document text* and your *question* get sent to the OpenAI API via HTTPS. The extension never touches local files beyond the current page context.
+**DocBot** - Empowering smarter document analysis with AI 🚀
