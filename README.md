@@ -11,6 +11,7 @@ DocBot helps developers, researchers, and teams quickly extract key information 
 - **Real-time Analysis**: Automatically detect and process active documents on Windows
 - **Text Extraction**: Advanced text extraction with support for complex document structures
 - **Document Upload**: Direct file upload via web interface and browser extension
+  
   <img width="290" height="440" alt="upload pdf" src="https://github.com/user-attachments/assets/a98ed0e4-2b2b-46dd-a4ce-e7d5618d0504" />
 
 - **Document Comparison**: Side-by-side comparison of two documents with AI-powered change analysis
@@ -19,6 +20,7 @@ DocBot helps developers, researchers, and teams quickly extract key information 
 
 ### 🤖 AI-Powered Chat Interface
 - **Natural Language Queries**: Ask questions about documents in plain English
+  
   <img width="289" height="439" alt="ChatBot interface" src="https://github.com/user-attachments/assets/05dabe3e-3dcb-4e8c-ae58-a399963ddc60" />
 - **Summaries**: Get concise bullet-point summary for the document/web page.
   <img width="299" height="443" alt="auto-suggested-questions" src="https://github.com/user-attachments/assets/8c5b2765-7f53-4619-b044-5cd9f01d8198" />
