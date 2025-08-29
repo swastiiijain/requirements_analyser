@@ -15,6 +15,7 @@ DocBot helps developers, researchers, and teams quickly extract key information 
   <img width="290" height="440" alt="upload pdf" src="https://github.com/user-attachments/assets/a98ed0e4-2b2b-46dd-a4ce-e7d5618d0504" />
 
 - **Document Comparison**: Side-by-side comparison of two documents with AI-powered change analysis
+  
   <img width="960" height="476" alt="comparison doc" src="https://github.com/user-attachments/assets/0575de60-a2fd-4291-9333-7ceb819ec707" />
 
 
@@ -23,22 +24,27 @@ DocBot helps developers, researchers, and teams quickly extract key information 
   
   <img width="289" height="439" alt="ChatBot interface" src="https://github.com/user-attachments/assets/05dabe3e-3dcb-4e8c-ae58-a399963ddc60" />
 - **Summaries**: Get concise bullet-point summary for the document/web page.
+  
   <img width="299" height="443" alt="auto-suggested-questions" src="https://github.com/user-attachments/assets/8c5b2765-7f53-4619-b044-5cd9f01d8198" />
 
 - **Context-Aware Responses**: AI understands document context and provides relevant answers
 - **Auto-suggestions**: Smart question suggestions based on document content
+  
   <img width="299" height="443" alt="auto-suggested-questions" src="https://github.com/user-attachments/assets/0b51c3d3-baed-46de-8260-286423e392ee" />
 
 - **Explain Tooltip**: Select any text to get simplified explanations
+  
   <img width="490" height="427" alt="Explain tooltip" src="https://github.com/user-attachments/assets/db25f97e-6e8e-4b89-a531-51d75855ce15" />
 
 - **Conversation History**: Maintains chat history per document session. User can also delete history for the current session.
+  
   <img width="293" height="436" alt="clear history" src="https://github.com/user-attachments/assets/f720bac1-7db9-432a-897c-37011be90085" />
 
 ### 🌐 Browser Extension (DocBot)
 - **Web Document Analysis**: Works with Google Docs, Word Online, PDF viewers, and any web content
 - **In-page Chat**: Chat overlay directly on web pages
 - **Document Notes**: Save and organize notes with timestamps and topics
+  
   <img width="284" height="436" alt="notes docbot" src="https://github.com/user-attachments/assets/d6f5b466-f5fd-44fc-97af-39e3d59e426f" />
 
 - **Export Capabilities**: Export notes, summary, chat history and comparisons to PDF
